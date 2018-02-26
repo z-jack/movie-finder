@@ -46,6 +46,7 @@ export default {
   computed: {
     pathSummary() {
       let data = [];
+      if (!this.app_config || !this.app_config.volumes) return [];
       this.app_config.volumes.forEach(v => {
         v.directories.forEach(d => {
           let block = {
@@ -174,7 +175,7 @@ export default {
       }
     },
     delPath(sig) {
-      let blk = this.xTableSelect[sig]
+      let blk = this.xTableSelect[sig];
       let newconf = utils.copyObj(this.app_config);
       newconf.volumes.forEach(v => {
         v.directories = v.directories.filter(d => {

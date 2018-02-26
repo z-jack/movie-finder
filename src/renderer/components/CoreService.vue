@@ -195,14 +195,13 @@ export default {
         return;
       let dest = path.join(window.process.cwd(), "ffmpeg");
       if (!fs.existsSync(dest)) fs.mkdirSync(dest);
-      ffbinaries.downloadFiles(
+      await promisify(ffbinaries.downloadFiles)(
         ["ffmpeg"],
         {
           platform: ffbinaries.detectPlatform(),
           quiet: true,
           destination: dest
-        },
-        () => {}
+        }
       );
       this.setByKeyValue([
         "ffmpeg",

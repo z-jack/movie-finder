@@ -216,7 +216,7 @@ export default {
       shell.openItem(path.join(fb.pk, fb.fileName));
     },
     refreshThumb() {
-      this.$set(this, "refdig", refdig + 1);
+      this.$set(this, "refdig", this.refdig + 1);
     },
     toggleItem(fb) {
       utils.parse2ConfigFormat(fb.pk, conf => {
@@ -267,7 +267,7 @@ export default {
       );
       return dev.map(x => x.mountpoints[idx].path);
     },
-    ...mapActions(["setConfig", "emit", "setByPath"])
+    ...mapActions(["setConfig", "emit", "setByPath", "handle"])
   },
   watch: {
     event() {
@@ -281,7 +281,7 @@ export default {
       }
     },
     search_content() {
-      this.page = 1;
+      this.$set("page", 1);
     }
   },
   components: {

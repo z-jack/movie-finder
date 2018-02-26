@@ -11,13 +11,15 @@ import utils from "./utils";
 import md5 from "md5";
 import pathVal from "is-valid-path";
 import execQ from "./execq";
+const { app } = require("electron").remote;
 const exec = promisify(require("child_process").exec);
 
 export default {
   name: "core-service",
   data() {
     return {
-      eQ: null
+      eQ: null,
+      analysed: []
     };
   },
   computed: {
@@ -32,7 +34,7 @@ export default {
     app_config: {
       handler: function() {
         if (window.process.env.NODE_ENV !== "development") {
-          let dir = path.join(window.process.cwd(), "app_config.json");
+          let dir = path.join(app.getPath("userData"), "app_config.json");
           fs.open(dir, "w", (err, fd) => {
             if (err) {
               console.error(err);
@@ -64,83 +66,93 @@ export default {
     }
   },
   methods: {
-    async analyseDirectory(dir) {
-      await this.ffSupportSDK();
-      let files = fs.readdirSync(dir);
-      if (this.app_config && !this.app_config.VF) {
-        this.setByKeyValue(["VF", utils.copyObj(this.defext)]);
-      }
-      utils.parse2ConfigFormat(dir, async conf => {
-        let fprops = [];
-        let embedded = false;
-        let newconf = utils.copyObj(this.app_config);
-        let dirref = null;
-        newconf.volumes.forEach(x => {
-          if (
-            !embedded &&
-            x.isPortable == conf.isPortable &&
-            (x.isPortable
-              ? x.description == conf.description &&
-                x.mountIndex == conf.mountIndex &&
-                x.partitions == conf.partitions &&
-                x.size == conf.size
-              : x.volume == conf.volume)
-          ) {
-            let b = x.directories.find(x => x.path == conf.directories[0].path);
-            if (b) {
-              embedded = true;
-              fprops = b.files;
-              dirref = b;
-            }
-          }
+    async analyseDirectory(dir, flag) {
+      if (this.analysed.indexOf(dir) < 0 || flag) {
+        const msg = this.$Message.loading({
+          content: "正在分析目录结构...",
+          duration: 0
         });
-        for (let i = 0; i < files.length; i++) {
-          let f = files[i];
-          try {
-            let s = await promisify(fs.stat)(path.join(dir, f));
-            if (s.isFile()) {
-              let file = path.join(dir, f);
-              if (
-                this.app_config.VF.indexOf(
-                  this.exts.indexOf(path.extname(file))
-                ) >= 0
-              ) {
-                if (fprops.find(x => x.fileName == f)) return;
-                let uuid = conf.isPortable
-                  ? conf.description +
-                    "__" +
-                    conf.mountIndex +
-                    "__" +
-                    conf.partitions +
-                    "__" +
-                    conf.size
-                  : conf.volume;
-                uuid += conf.directories[0].path + f;
-                let fdes = {
-                  fileName: f,
-                  nameSlice: utils.splitChinese(
-                    path.basename(f, path.extname(f))
-                  ),
-                  hasViewed: false,
-                  md5: md5(uuid)
-                };
-                this.generateThumb(dir, fdes);
-                fprops.push(fdes);
+        await this.ffSupportSDK();
+        let files = fs.readdirSync(dir);
+        if (this.app_config && !this.app_config.VF) {
+          this.setByKeyValue(["VF", utils.copyObj(this.defext)]);
+        }
+        utils.parse2ConfigFormat(dir, async conf => {
+          let fprops = [];
+          let embedded = false;
+          let newconf = utils.copyObj(this.app_config);
+          let dirref = null;
+          newconf.volumes.forEach(x => {
+            if (
+              !embedded &&
+              x.isPortable == conf.isPortable &&
+              (x.isPortable
+                ? x.description == conf.description &&
+                  x.mountIndex == conf.mountIndex &&
+                  x.partitions == conf.partitions &&
+                  x.size == conf.size
+                : x.volume == conf.volume)
+            ) {
+              let b = x.directories.find(
+                x => x.path == conf.directories[0].path
+              );
+              if (b) {
+                embedded = true;
+                fprops = b.files;
+                dirref = b;
               }
             }
-          } catch (_) {}
-        }
-        if (dirref)
-          dirref.files = fprops
-            .filter(x => fs.existsSync(path.join(dir, x.fileName)))
-            .filter(
-              x =>
-                this.app_config.VF.indexOf(
-                  this.exts.indexOf(path.extname(x.fileName))
-                ) >= 0
-            );
-        this.setConfig(newconf);
-      });
+          });
+          for (let i = 0; i < files.length; i++) {
+            let f = files[i];
+            try {
+              let s = await promisify(fs.stat)(path.join(dir, f));
+              if (s.isFile()) {
+                let file = path.join(dir, f);
+                if (
+                  this.app_config.VF.indexOf(
+                    this.exts.indexOf(path.extname(file))
+                  ) >= 0
+                ) {
+                  if (fprops.find(x => x.fileName == f)) continue;
+                  let uuid = conf.isPortable
+                    ? conf.description +
+                      "__" +
+                      conf.mountIndex +
+                      "__" +
+                      conf.partitions +
+                      "__" +
+                      conf.size
+                    : conf.volume;
+                  uuid += conf.directories[0].path + f;
+                  let fdes = {
+                    fileName: f,
+                    nameSlice: utils.splitChinese(
+                      path.basename(f, path.extname(f))
+                    ),
+                    hasViewed: false,
+                    md5: md5(uuid)
+                  };
+                  this.generateThumb(dir, fdes);
+                  fprops.push(fdes);
+                }
+              }
+            } catch (_) {}
+          }
+          if (dirref)
+            dirref.files = fprops
+              .filter(x => fs.existsSync(path.join(dir, x.fileName)))
+              .filter(
+                x =>
+                  this.app_config.VF.indexOf(
+                    this.exts.indexOf(path.extname(x.fileName))
+                  ) >= 0
+              );
+          this.analysed.push(dir);
+          this.setConfig(newconf);
+          msg();
+        });
+      }
     },
     markAll(flag) {
       let newconf = utils.copyObj(this.app_config);
@@ -158,7 +170,7 @@ export default {
         fdes = JSON.parse(fdes);
         d = true;
       }
-      let thumbdir = path.join(window.process.cwd(), "thumbs");
+      let thumbdir = path.join(app.getPath("userData"), "thumbs");
       if (!fs.existsSync(thumbdir)) fs.mkdirSync(thumbdir);
       let input = path.join(dir, fdes.fileName);
       let output = path.join(thumbdir, fdes.md5 + ".jpg");
@@ -171,7 +183,12 @@ export default {
         this.$set(this, "eQ", q);
       }
       if (this.eQ.exists(x => x[0].includes(output))) return;
-      if (pathVal(this.app_config.ffmpeg) && pathVal(input) && pathVal(output))
+      if (
+        pathVal(this.app_config.ffmpeg) &&
+        pathVal(input) &&
+        pathVal(output) &&
+        fs.existsSync(this.app_config.ffmpeg)
+      )
         this.eQ.push(
           this.app_config.ffmpeg +
             " -y -ss " +
@@ -190,19 +207,17 @@ export default {
       if (
         this.app_config &&
         this.app_config.ffmpeg &&
-        pathVal(this.app_config.ffmpeg)
+        pathVal(this.app_config.ffmpeg) &&
+        fs.existsSync(this.app_config.ffmpeg)
       )
         return;
-      let dest = path.join(window.process.cwd(), "ffmpeg");
+      let dest = path.join(app.getPath("userData"), "ffmpeg");
       if (!fs.existsSync(dest)) fs.mkdirSync(dest);
-      await promisify(ffbinaries.downloadFiles)(
-        ["ffmpeg"],
-        {
-          platform: ffbinaries.detectPlatform(),
-          quiet: true,
-          destination: dest
-        }
-      );
+      await promisify(ffbinaries.downloadFiles)(["ffmpeg"], {
+        platform: ffbinaries.detectPlatform(),
+        quiet: true,
+        destination: dest
+      });
       this.setByKeyValue([
         "ffmpeg",
         path.join(
@@ -216,7 +231,7 @@ export default {
   mounted() {
     console.log("core-service launched.");
     if (window.process.env.NODE_ENV !== "development") {
-      let dir = path.join(window.process.cwd(), "app_config.json");
+      let dir = path.join(app.getPath("userData"), "app_config.json");
       if (!fs.existsSync(dir)) {
         fs.open(dir, "w+", (err, fd) => {
           if (err) {

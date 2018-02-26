@@ -50,6 +50,7 @@ import fuzzy from "fuzzy";
 import { shell } from "electron";
 import Waterfall from "vue-waterfall/lib/waterfall";
 import WaterfallSlot from "vue-waterfall/lib/waterfall-slot";
+const { app } = require("electron").remote;
 const { dialog, BrowserWindow } = require("electron").remote;
 
 export default {
@@ -110,7 +111,11 @@ export default {
             fblk.volume = v.volume;
             fblk.pk = v.volume + d.path;
             fblk.base = path.basename(f.fileName, path.extname(f.fileName));
-            let p = path.join(window.process.cwd(), "thumbs", f.md5 + ".jpg");
+            let p = path.join(
+              app.getPath("userData"),
+              "thumbs",
+              f.md5 + ".jpg"
+            );
             if (fs.existsSync(p)) {
               fblk.image = utils.safeURI(p);
             } else {
@@ -280,7 +285,13 @@ export default {
         else this.handle(evt);
       }
     },
+    page() {
+      this.$el.parentElement.scrollTop = 0;
+    },
     search_content() {
+      this.$set(this, "page", 1);
+    },
+    onlyV() {
       this.$set(this, "page", 1);
     }
   },

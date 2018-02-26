@@ -281,7 +281,7 @@ export default {
       }
     },
     search_content() {
-      this.$set("page", 1);
+      this.$set(this, "page", 1);
     }
   },
   components: {

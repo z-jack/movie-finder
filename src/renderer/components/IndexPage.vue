@@ -143,16 +143,21 @@ export default {
             let slice = utils.crossArrProduct(x.nameSlice);
             return {
               block: x,
-              fuzzy: fuzzy.filter(this.search_content, slice)
+              fuzzy: fuzzy.filter(this.search_content, slice).map(y => {
+                return {
+                  x_index: y.original.indexOf(this.search_content[0]),
+                  ...y
+                }
+              })
             };
           } else
             return {
               block: x,
-              fuzzy: [{ score: a.length - i }]
+              fuzzy: [{ score: a.length - i, x_index: i }]
             };
         })
         .filter(x => x.fuzzy.length > 0)
-        .sort((i, j) => j.fuzzy[0].score - i.fuzzy[0].score)
+        .sort((i, j) => j.fuzzy[0].score - i.fuzzy[0].score || i.fuzzy[0].x_index - j.fuzzy[0].x_index)
         .map(x => x.block);
     },
     ...mapState({
@@ -196,9 +201,9 @@ export default {
               x.isPortable == conf.isPortable &&
               (x.isPortable
                 ? x.description == conf.description &&
-                  x.mountIndex == conf.mountIndex &&
-                  x.partitions == conf.partitions &&
-                  x.size == conf.size
+                x.mountIndex == conf.mountIndex &&
+                x.partitions == conf.partitions &&
+                x.size == conf.size
                 : x.volume == conf.volume)
             ) {
               embedded = true;
@@ -234,9 +239,9 @@ export default {
             x.isPortable == conf.isPortable &&
             (x.isPortable
               ? x.description == conf.description &&
-                x.mountIndex == conf.mountIndex &&
-                x.partitions == conf.partitions &&
-                x.size == conf.size
+              x.mountIndex == conf.mountIndex &&
+              x.partitions == conf.partitions &&
+              x.size == conf.size
               : x.volume == conf.volume)
           ) {
             let b = x.directories.find(x => x.path == conf.directories[0].path);

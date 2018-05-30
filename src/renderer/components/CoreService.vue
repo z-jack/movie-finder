@@ -111,7 +111,7 @@ export default {
                 let file = path.join(dir, f);
                 if (
                   this.app_config.VF.indexOf(
-                    this.exts.indexOf(path.extname(file))
+                    this.exts.indexOf(path.extname(file).toLowerCase())
                   ) >= 0
                 ) {
                   if (fprops.find(x => x.fileName == f)) continue;
@@ -128,7 +128,7 @@ export default {
                   let fdes = {
                     fileName: f,
                     nameSlice: utils.splitChinese(
-                      path.basename(f, path.extname(f))
+                      path.basename(f, path.extname(f).toLowerCase())
                     ),
                     hasViewed: false,
                     md5: md5(uuid)
@@ -145,7 +145,7 @@ export default {
               .filter(
                 x =>
                   this.app_config.VF.indexOf(
-                    this.exts.indexOf(path.extname(x.fileName))
+                    this.exts.indexOf(path.extname(x.fileName).toLowerCase())
                   ) >= 0
               );
           this.analysed.push(dir);

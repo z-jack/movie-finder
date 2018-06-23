@@ -21,7 +21,7 @@ async function parseUSB2Vol(des, idx, par, size) {
   });
   dev = dev.filter(
     x =>
-      x.description == des && x.mountpoints.length == par && x.size == size
+    x.description == des && x.mountpoints.length == par && x.size == size
   );
   return dev.map(x => x.mountpoints[idx].path);
 }
@@ -69,6 +69,7 @@ function parse2ConfigFormat(path, cbk) {
           "__" +
           tmpBlk.size :
           tmpBlk.volume;
+        let p = path.slice(tmpBlk.volume.length)
         if (tmpBlk.isPortable) {
           delete tmpBlk["volume"];
         } else {
@@ -78,7 +79,6 @@ function parse2ConfigFormat(path, cbk) {
           delete tmpBlk["size"];
         }
         tmpBlk.uuid = md5(vid)
-        let p = path.slice(tmpBlk.volume.length)
         tmpBlk.directories = [{
           path: p,
           uuid: md5(vid + p)

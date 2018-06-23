@@ -30,7 +30,7 @@
             <p @click="openFile(item)">{{ item.base }}</p>
           </div>
           <div class="btngroup">
-            <Button type="ghost" shape="circle" :icon="item.hasViewed ? 'ios-checkmark-empty' : 'ios-glasses-outline'" @click="toggleItem(item)"></Button><Button type="ghost" shape="circle" icon="ios-more" @click="navi('detail-page', {type:'ijump', item})"></Button>
+            <Button :type="item.hasViewed ? 'success' : 'ghost'" shape="circle" :icon="item.hasViewed ? 'ios-checkmark-empty' : 'ios-glasses-outline'" @click="toggleItem(item)"></Button><Button type="ghost" shape="circle" icon="ios-more" @click="navi('detail-page', {type:'ijump', item})"></Button>
           </div>
         </div>
       </waterfall-slot>

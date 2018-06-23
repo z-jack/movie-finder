@@ -1,3 +1,5 @@
+<p align="center"><img src="./build/icons/1024x1024.png" alt="Movie Finder" width="200" /></p>
+
 # movie-finder电影管理器
 
 > Manage the local movies

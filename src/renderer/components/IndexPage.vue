@@ -30,7 +30,7 @@
             <p @click="openFile(item)">{{ item.base }}</p>
           </div>
           <div class="btngroup">
-            <Button type="ghost" shape="circle" icon="ios-folder" @click="openDirectory(item)"></Button><Button :type="item.hasViewed ? 'success' : 'ghost'" shape="circle" :icon="item.hasViewed ? 'ios-checkmark-empty' : 'ios-glasses-outline'" @click="toggleItem(item)"></Button>
+            <Button type="ghost" shape="circle" :icon="item.hasViewed ? 'ios-checkmark-empty' : 'ios-glasses-outline'" @click="toggleItem(item)"></Button><Button type="ghost" shape="circle" icon="ios-more" @click="navi('detail-page', {type:'ijump', item})"></Button>
           </div>
         </div>
       </waterfall-slot>
@@ -69,7 +69,7 @@ export default {
       let volumes = [];
       await this.app_config.volumes.forEach(async element => {
         if (element.isPortable) {
-          let dev = await this.parseUSB2Vol(
+          let dev = await utils.parseUSB2Vol(
             element.description,
             element.mountIndex,
             element.partitions,
@@ -80,7 +80,8 @@ export default {
           if (!volumes.includes(volume))
             volumes.push({
               volume,
-              directories: element.directories
+              directories: element.directories,
+              uuid: element.uuid
             });
           else
             volumes
@@ -104,26 +105,33 @@ export default {
       let flist = [];
       let refdig = this.refdig;
       if (!this.volumes) return [];
-      this.volumes.forEach(v => {
-        v.directories.forEach(d => {
-          d.files.forEach(f => {
-            let fblk = utils.copyObj(f);
-            fblk.volume = v.volume;
-            fblk.pk = v.volume + d.path;
-            fblk.base = path.basename(f.fileName, path.extname(f.fileName));
-            let p = path.join(
-              app.getPath("userData"),
-              "thumbs",
-              f.md5 + ".jpg"
-            );
-            if (fs.existsSync(p)) {
-              fblk.image = utils.safeURI(p);
-            } else {
-              this.invoke("generateThumb", fblk.pk, JSON.stringify(f));
-            }
-            flist.push(fblk);
-          });
-        });
+      if (!this.app_config.files) return [];
+      this.app_config.files.forEach(f => {
+        let floc = this.app_config.locates.find(x => x.fid == f.uuid)
+        let v = this.volumes.find(x => x.uuid == floc.vid)
+        if (!v) return
+        let fblk = utils.copyObj(f);
+        let d = v.directories.find(x => x.uuid == floc.pid)
+        fblk.volume = v.volume;
+        fblk.pk = v.volume + d.path;
+        fblk.base = path.basename(f.fileName, path.extname(f.fileName));
+        if (this.app_config.binds) {
+          let fbind = this.app_config.binds.find(x => x.fid == f.uuid)
+          if (fbind) {
+            fblk.douid = fbind.did
+          }
+        }
+        let p = path.join(
+          app.getPath("userData"),
+          "thumbs",
+          f.uuid + ".jpg"
+        );
+        if (fs.existsSync(p)) {
+          fblk.image = utils.safeURI(p);
+        } else {
+          this.invoke("generateThumb", fblk.pk, JSON.stringify(f));
+        }
+        flist.push(fblk);
       });
       return flist;
     },
@@ -175,7 +183,7 @@ export default {
     async invokeAnalyseVolume(dirs, volume) {
       await true;
       dirs.forEach(dir => {
-        this.invokeAnalyseDir(path.join(volume + dir.path));
+        this.invokeAnalyseDir(volume + dir.path);
       });
     },
     invokeAnalyseDir(dir) {
@@ -229,53 +237,23 @@ export default {
       this.$set(this, "refdig", this.refdig + 1);
     },
     toggleItem(fb) {
-      utils.parse2ConfigFormat(fb.pk, conf => {
-        let newconf = utils.copyObj(this.app_config);
-        let embedded = false;
-        for (let i = 0; i < newconf.volumes.length; i++) {
-          let x = newconf.volumes[i];
-          if (
-            !embedded &&
-            x.isPortable == conf.isPortable &&
-            (x.isPortable
-              ? x.description == conf.description &&
-              x.mountIndex == conf.mountIndex &&
-              x.partitions == conf.partitions &&
-              x.size == conf.size
-              : x.volume == conf.volume)
-          ) {
-            let b = x.directories.find(x => x.path == conf.directories[0].path);
-            if (b) {
-              let j = x.directories.indexOf(b);
-              let f = b.files.find(x => x.fileName == fb.fileName);
-              if (f) {
-                embedded = true;
-                let k = b.files.indexOf(f);
-                this.setByPath([
-                  ["volumes", i, "directories", j, "files", k, "hasViewed"],
-                  !f.hasViewed
-                ]);
-              }
-            }
-          }
-        }
-      });
+      let f = this.app_config.files.find(x => x.uuid == fb.uuid);
+      if (f) {
+        let k = this.app_config.files.indexOf(f)
+        this.setByPath([
+          ['files', k, 'hasViewed'],
+          !fb.hasViewed
+        ])
+      }
     },
-    async parseUSB2Vol(des, idx, par, size) {
-      let dev = await new Promise((res, rej) => {
-        driveList.list((err, dev) => {
-          if (err) {
-            rej(err);
-            return;
-          }
-          res(dev);
-        });
-      });
-      dev = dev.filter(
-        x =>
-          x.description == des && x.mountpoints.length == par && x.size == size
-      );
-      return dev.map(x => x.mountpoints[idx].path);
+    navi(name, params) {
+      if (params === undefined)
+        this.$router.push(`/${name}`);
+      else
+        this.$router.push({
+          name,
+          params
+        })
     },
     ...mapActions(["setConfig", "emit", "setByPath", "handle"])
   },

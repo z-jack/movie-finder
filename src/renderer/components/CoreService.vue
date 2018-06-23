@@ -9,7 +9,6 @@ import ffbinaries from "ffbinaries";
 import { promisify } from "util";
 import utils from "./utils";
 import md5 from "md5";
-import pathVal from "is-valid-path";
 import execQ from "./execq";
 const { app } = require("electron").remote;
 const exec = promisify(require("child_process").exec);
@@ -32,7 +31,7 @@ export default {
   },
   watch: {
     app_config: {
-      handler: function() {
+      handler: function () {
         if (window.process.env.NODE_ENV !== "development") {
           let dir = path.join(app.getPath("userData"), "app_config.json");
           fs.open(dir, "w", (err, fd) => {
@@ -78,31 +77,20 @@ export default {
           this.setByKeyValue(["VF", utils.copyObj(this.defext)]);
         }
         utils.parse2ConfigFormat(dir, async conf => {
-          let fprops = [];
-          let embedded = false;
           let newconf = utils.copyObj(this.app_config);
-          let dirref = null;
-          newconf.volumes.forEach(x => {
-            if (
-              !embedded &&
-              x.isPortable == conf.isPortable &&
-              (x.isPortable
-                ? x.description == conf.description &&
-                  x.mountIndex == conf.mountIndex &&
-                  x.partitions == conf.partitions &&
-                  x.size == conf.size
-                : x.volume == conf.volume)
-            ) {
-              let b = x.directories.find(
-                x => x.path == conf.directories[0].path
-              );
-              if (b) {
-                embedded = true;
-                fprops = b.files;
-                dirref = b;
-              }
-            }
-          });
+          let vid = conf.isPortable
+            ? conf.description +
+            "__" +
+            conf.mountIndex +
+            "__" +
+            conf.partitions +
+            "__" +
+            conf.size
+            : conf.volume;
+          let pid = vid + conf.directories[0].path
+          if (!newconf.files) newconf.files = []
+          if (!newconf.locates) newconf.locates = []
+          if (!newconf.binds) newconf.binds = []
           for (let i = 0; i < files.length; i++) {
             let f = files[i];
             try {
@@ -114,56 +102,127 @@ export default {
                     this.exts.indexOf(path.extname(file).toLowerCase())
                   ) >= 0
                 ) {
-                  if (fprops.find(x => x.fileName == f)) continue;
-                  let uuid = conf.isPortable
-                    ? conf.description +
-                      "__" +
-                      conf.mountIndex +
-                      "__" +
-                      conf.partitions +
-                      "__" +
-                      conf.size
-                    : conf.volume;
-                  uuid += conf.directories[0].path + f;
+                  let fid = pid + f
+                  let uuid = md5(fid)
+                  if (newconf.files.find(x => x.uuid == uuid)) continue;
                   let fdes = {
                     fileName: f,
                     nameSlice: utils.splitChinese(
                       path.basename(f, path.extname(f).toLowerCase())
                     ),
                     hasViewed: false,
-                    md5: md5(uuid)
+                    uuid: uuid
                   };
                   this.generateThumb(dir, fdes);
-                  fprops.push(fdes);
+                  newconf.files.push(fdes);
+                  newconf.locates.push({
+                    vid: md5(vid),
+                    pid: md5(pid),
+                    fid: uuid
+                  })
                 }
               }
-            } catch (_) {}
+            } catch (_) { }
           }
-          if (dirref)
-            dirref.files = fprops
-              .filter(x => fs.existsSync(path.join(dir, x.fileName)))
-              .filter(
-                x =>
-                  this.app_config.VF.indexOf(
-                    this.exts.indexOf(path.extname(x.fileName).toLowerCase())
-                  ) >= 0
-              );
+          newconf.files = newconf.files.filter(x => {
+            let floc = newconf.locates.filter(y => y.fid == x.uuid)
+            if (floc.length != 1) return false
+            if (floc[0].vid != conf.uuid || floc[0].pid != conf.directories[0].uuid) return true
+            return fs.existsSync(path.join(dir, x.fileName))
+          }).filter(
+            x =>
+              this.app_config.VF.indexOf(
+                this.exts.indexOf(path.extname(x.fileName).toLowerCase())
+              ) >= 0
+          );
           this.analysed.push(dir);
           this.setConfig(newconf);
           msg();
         });
       }
     },
+    removedDirectory(dir) {
+      let d = this.analysed.indexOf(dir)
+      if (d >= 0) {
+        this.analysed.splice(d, 1)
+      }
+    },
+    migrateFromV1(cfg) {
+      let v2 = utils.copyObj(cfg);
+      v2.version = '2.0'
+      delete v2.volumes
+      v2.volumes = cfg.volumes.map(x => {
+        let uuid = x.isPortable
+          ? x.description +
+          "__" +
+          x.mountIndex +
+          "__" +
+          x.partitions +
+          "__" +
+          x.size
+          : x.volume
+        let dirs = x.directories.map(y => {
+          return {
+            path: y.path,
+            uuid: md5(uuid + y.path)
+          }
+        })
+        return x.isPortable ? {
+          isPortable: true,
+          description: x.description,
+          mountIndex: x.mountIndex,
+          partitions: x.partitions,
+          size: x.size,
+          uuid: md5(uuid),
+          directories: dirs
+        } : {
+            isPortable: false,
+            volume: x.volume,
+            uuid: md5(uuid),
+            directories: dirs
+          }
+      })
+      v2.files = []
+      v2.locates = []
+      v2.binds = []
+      cfg.volumes.forEach(x => {
+        x.directories.forEach(y => {
+          y.files.forEach(z => {
+            let uuid = x.isPortable
+              ? x.description +
+              "__" +
+              x.mountIndex +
+              "__" +
+              x.partitions +
+              "__" +
+              x.size
+              : x.volume
+            v2.files.push({
+              uuid: z.md5,
+              fileName: z.fileName,
+              nameSlice: z.nameSlice,
+              hasViewed: z.hasViewed
+            })
+            v2.locates.push({
+              vid: md5(uuid),
+              pid: md5(uuid + y.path),
+              fid: z.md5
+            })
+          })
+        })
+      })
+      return v2
+    },
     markAll(flag) {
       let newconf = utils.copyObj(this.app_config);
-      newconf.volumes.forEach(v => {
-        v.directories.forEach(d => {
-          d.files.forEach(f => {
-            f.hasViewed = !!+flag;
-          });
-        });
+      newconf.files.forEach(f => {
+        f.hasViewed = !!+flag;
       });
       this.setConfig(newconf);
+    },
+    pathVal(p) {
+      if (typeof p !== 'string') return false
+      return path.isAbsolute(p)
     },
     generateThumb(dir, fdes, d) {
       if (typeof fdes === "string") {
@@ -173,9 +232,9 @@ export default {
       let thumbdir = path.join(app.getPath("userData"), "thumbs");
       if (!fs.existsSync(thumbdir)) fs.mkdirSync(thumbdir);
       let input = path.join(dir, fdes.fileName);
-      let output = path.join(thumbdir, fdes.md5 + ".jpg");
+      let output = path.join(thumbdir, fdes.uuid + ".jpg");
       if (fs.existsSync(output)) {
-        d && this.emit("refreshThumb:" + fdes.md5);
+        d && this.emit("refreshThumb:" + fdes.uuid);
         return;
       }
       if (!this.eQ) {
@@ -184,22 +243,22 @@ export default {
       }
       if (this.eQ.exists(x => x[0].includes(output))) return;
       if (
-        pathVal(this.app_config.ffmpeg) &&
-        pathVal(input) &&
-        pathVal(output) &&
+        this.pathVal(this.app_config.ffmpeg) &&
+        this.pathVal(input) &&
+        this.pathVal(output) &&
         fs.existsSync(this.app_config.ffmpeg)
       )
         this.eQ.push(
           this.app_config.ffmpeg +
-            " -y -ss " +
-            (Math.random() * 60 + 60) +
-            ' -stream_loop -1 -i "' +
-            input +
-            '" -vf scale=400:-1 -vframes 1 -q:v 2 "' +
-            output +
-            '"',
+          " -y -ss " +
+          (Math.random() * 60 + 60) +
+          ' -stream_loop -1 -i "' +
+          input +
+          '" -vf scale=400:-1 -vframes 1 -q:v 2 "' +
+          output +
+          '"',
           () => {
-            this.emit("refreshThumb:" + fdes.md5);
+            this.emit("refreshThumb:" + fdes.uuid);
           }
         );
     },
@@ -207,17 +266,26 @@ export default {
       if (
         this.app_config &&
         this.app_config.ffmpeg &&
-        pathVal(this.app_config.ffmpeg) &&
+        this.pathVal(this.app_config.ffmpeg) &&
         fs.existsSync(this.app_config.ffmpeg)
       )
         return;
       let dest = path.join(app.getPath("userData"), "ffmpeg");
       if (!fs.existsSync(dest)) fs.mkdirSync(dest);
-      await promisify(ffbinaries.downloadFiles)(["ffmpeg"], {
-        platform: ffbinaries.detectPlatform(),
-        quiet: true,
-        destination: dest
-      });
+      if (!fs.existsSync(path.join(
+        dest,
+        ffbinaries.getBinaryFilename("ffmpeg", ffbinaries.detectPlatform())
+      ))) {
+        try {
+          await promisify(ffbinaries.downloadFiles)(["ffmpeg"], {
+            platform: ffbinaries.detectPlatform(),
+            quiet: true,
+            destination: dest
+          });
+        } catch (_) {
+          return
+        }
+      }
       this.setByKeyValue([
         "ffmpeg",
         path.join(
@@ -249,6 +317,9 @@ export default {
           }
           try {
             let cfg = JSON.parse(data) || {};
+            if (cfg.version != '2.0') {
+              cfg = this.migrateFromV1(cfg)
+            }
             this.setConfig(cfg);
           } catch (e) {
             console.error(e);

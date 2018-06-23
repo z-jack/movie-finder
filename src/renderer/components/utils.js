@@ -2,9 +2,28 @@ import pinyin from "pinyin"
 import driveList from "drivelist"
 import _ from "underscore"
 import fileURL from "file-url"
+import md5 from 'md5'
+import axios from 'axios'
 
 function copyObj(obj) {
   return JSON.parse(JSON.stringify(obj))
+}
+
+async function parseUSB2Vol(des, idx, par, size) {
+  let dev = await new Promise((res, rej) => {
+    driveList.list((err, dev) => {
+      if (err) {
+        rej(err);
+        return;
+      }
+      res(dev);
+    });
+  });
+  dev = dev.filter(
+    x =>
+      x.description == des && x.mountpoints.length == par && x.size == size
+  );
+  return dev.map(x => x.mountpoints[idx].path);
 }
 
 function parse2ConfigFormat(path, cbk) {
@@ -41,20 +60,29 @@ function parse2ConfigFormat(path, cbk) {
         });
       });
       if (tmpBlk.volume.length) {
-        tmpBlk.directories = [
-          {
-            path: path.slice(tmpBlk.volume.length),
-            recursive: false,
-            files: []
-          }
-        ];
-        if (tmpBlk.isPortable) delete tmpBlk["volume"];
-        else {
+        let vid = tmpBlk.isPortable ?
+          tmpBlk.description +
+          "__" +
+          tmpBlk.mountIndex +
+          "__" +
+          tmpBlk.partitions +
+          "__" +
+          tmpBlk.size :
+          tmpBlk.volume;
+        if (tmpBlk.isPortable) {
+          delete tmpBlk["volume"];
+        } else {
           delete tmpBlk["description"];
           delete tmpBlk["mountIndex"];
           delete tmpBlk["partitions"];
           delete tmpBlk["size"];
         }
+        tmpBlk.uuid = md5(vid)
+        let p = path.slice(tmpBlk.volume.length)
+        tmpBlk.directories = [{
+          path: p,
+          uuid: md5(vid + p)
+        }];
         cbk(tmpBlk);
       }
     });
@@ -80,7 +108,10 @@ function splitChinese(hans) {
 
     words = hans[i];
 
-    let dict = pinyin(words, { heteronym: true, style: pinyin.STYLE_NORMAL });
+    let dict = pinyin(words, {
+      heteronym: true,
+      style: pinyin.STYLE_NORMAL
+    });
     if (dict.length === 1 && dict[0][0] != words) {
 
       // ends of non-chinese words.
@@ -114,6 +145,18 @@ function formatBytes(a, b) {
   return parseFloat((a / Math.pow(c, f)).toFixed(d)) + " " + e[f];
 }
 
+function iAmDouban(url) {
+  return axios.get(url + '?app_version=5.0.0&apikey=054022eaeae0b00e0fc068c0c0a2102a&appid=wx2f9b06c1de1ccfca', {
+    headers: {
+      'X-Rewrite': JSON.stringify({
+        Host: 'm.douban.com',
+        Referer: 'https://servicewechat.com/wx2f9b06c1de1ccfca/8/page-frame.html',
+        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 11_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E302 MicroMessenger/6.6.7 NetType/4G Language/zh_CN'
+      })
+    }
+  }).catch(e => console.error(e))
+}
+
 export default {
   crossProduct,
   crossArrProduct,
@@ -121,5 +164,7 @@ export default {
   parse2ConfigFormat,
   copyObj,
   safeURI,
-  formatBytes
+  formatBytes,
+  iAmDouban,
+  parseUSB2Vol
 }

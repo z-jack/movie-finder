@@ -5,6 +5,7 @@
         <Input icon="ios-search" placeholder="在此页面搜索..." style="width: 100%" @on-change="searchUpdate" @on-focus="activeSearch" @on-blur="deactiveSearch"></Input>
         <Menu :theme="app_config.theme || 'light'" mode="vertical" @on-select="menuNavi" :active-name="activeName || 'index'">
           <MenuItem name="index" ><Icon type="ios-home-outline"></Icon>首页</MenuItem>
+          <MenuItem name="detail" ><Icon type="ionic"></Icon>电影详情</MenuItem>
           <MenuItem name="settings"><Icon type="ios-toggle-outline"></Icon>设置</MenuItem>
         </Menu>
       </Sider>
@@ -35,7 +36,7 @@ export default {
   },
   methods: {
     menuNavi(item) {
-      this.$router.push("/" + item);
+      this.$router.push(`/${item}`);
     },
     searchUpdate(e) {
       this.setSearchContent(e.target.value);
@@ -46,6 +47,11 @@ export default {
       "toggleSearch",
       "setSearchContent"
     ])
+  },
+  watch: {
+    $route(r) {
+      this.$set(this, "activeName", r.path.slice(1));
+    }
   },
   mounted() {
     this.$set(this, "activeName", this.$route.path.slice(1));
@@ -64,6 +70,7 @@ export default {
   overflow: hidden;
   background: #fff;
   height: calc(100vh - 69px);
+  cursor: default;
 }
 
 .root-content {
@@ -71,6 +78,12 @@ export default {
   margin-left: 240px;
   height: calc(100vh - 69px);
   overflow: auto;
+  cursor: default;
+}
+
+h1, h2, h3, h4, h5, p, span, li {
+  user-select: none;
+  cursor: inherit;
 }
 </style>
 

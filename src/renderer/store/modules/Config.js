@@ -1,7 +1,8 @@
 import Vue from "vue";
 
 const state = {
-    app_config: {}
+    app_config: {},
+    tmp_config: {}
 }
 
 const mutations = {
@@ -21,6 +22,10 @@ const mutations = {
             if (!cfg && i < p.length - 1) return
         }
         Vue.set(cfg, p.pop(), v)
+    },
+    SET_TMP(state, arr) {
+        let [k, v] = arr
+        Vue.set(state.tmp_config, k, v)
     }
 }
 
@@ -35,6 +40,10 @@ const actions = {
     setByPath({ commit }, arr) {
         if (!(arr instanceof Array) || arr.length != 2 || !(arr[0] instanceof Array)) return
         commit('SET_DEP', arr)
+    },
+    saveToTmp({ commit }, arr) {
+        if (!(arr instanceof Array) || arr.length != 2) return
+        commit('SET_TMP', arr)
     }
 }
 

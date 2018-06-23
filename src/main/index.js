@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, session } from 'electron'
 
 /**
  * Set `__static` path to static files in production
@@ -21,8 +21,8 @@ function createWindow() {
     height: 720,
     useContentSize: true,
     width: 1280,
-    minHeight: 500,
-    minWidth: 800,
+    minHeight: 700,
+    minWidth: 1024,
     webPreferences: { webSecurity: false }
   })
 
@@ -34,6 +34,18 @@ function createWindow() {
     mainWindow = null
   })
 
+  session.defaultSession.webRequest.onBeforeSendHeaders((d, c) => {
+    d.requestHeaders['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.79 Safari/537.36'
+    d.requestHeaders['Referer'] = d.url
+    if(d.requestHeaders['X-Rewrite'] !== undefined) {
+      let xHeaders = JSON.parse(d.requestHeaders['X-Rewrite'])
+      for(let key in xHeaders){
+        d.requestHeaders[key] = xHeaders[key]
+      }
+      delete d.requestHeaders['X-Rewrite']
+    }
+    c({ cancel: false, requestHeaders: d.requestHeaders })
+  })
   // mainWindow.webContents.openDevTools()
 }
 

@@ -2,7 +2,7 @@
 
 > Manage the local movies
 
-#### Build Setup
+## Build Setup
 
 ``` bash
 # install dependencies
@@ -25,7 +25,26 @@ P.S. The node module `drivelist` may need rebuild (`electron-builder install-app
 
 如果出现无法build的情况请为npm设置代理服务器。
 
-#### Config.JSON Structure
+## Release Note
+
+### V2.0.0
+
+* Add logo for app
+* Add integration of [douban](https://movie.douban.com) services
+* Add shortcuts for searching subtitles
+* Fix cannot add the same directory just deleted
+* Fix cannot generate screenshots properly
+* Optimize the config JSON structure
+* Optimize using experience
+
+### V1.0.0
+
+* The explorer of local movies
+* Auto-generate screenshots for movies
+
+## Config.JSON Structure
+
+### V1 (deprecated)
 
 ``` json
 {
@@ -82,17 +101,81 @@ P.S. The node module `drivelist` may need rebuild (`electron-builder install-app
 
 Due to binding to USB device dynamically, change the number of usb partition will cause corresponding data loss.
 
-#### Todo List
+### V2 (can migrate from V1)
 
-- [ ] Test Available Video Formats
-- [ ] Theme
-- [ ] Recursive Directory Index
-- [ ] Customize Sort
-- [ ] Efficient Thumbnail
-- [ ] Rebind USB + Thumbnail Rename
-- [ ] Clear Thumbnail
-- [ ] i18n
-- [ ] Performance
+``` json
+{
+    "version": "2.0",
+    "theme": "light",
+    "VF": [0, 2, 4],
+    "ffmpeg": "path/to/ffmpeg/executable/file",
+    "volumes": [
+        {
+            "isPortable": false,
+            "volume": "D:\\",
+            "uuid": "somethingIdForVolume",
+            "directories": [
+                {
+                    "path": "path/to/your/directory",
+                    "uuid": "somethingIdForPath"
+                }
+            ]
+        },
+        {
+            "isPortable": true,
+            "description": "WD Elements 10B8 USB Device",
+            "mountIndex": 0,
+            "partitions": 1,
+            "size": 2000365289472,
+            "uuid": "somethingIdForVolume",
+            "directories": [
+                {
+                    "path": "path/to/your/directory",
+                    "uuid": "somethingIdForPath"
+                }
+            ]
+        }
+    ],
+    "files": [
+        {
+            "uuid": "somethingIdForFile",
+            "fileName": "something中文.ext",
+            "nameSlice": [
+                ["something"],
+                ["中", "zhong"],
+                ["文", "wen"]
+            ],
+            "hasViewed": true
+        }
+    ],
+    "locates": [
+        {
+            "vid": "somethingIdForVolume",
+            "pid": "somethingIdForPath",
+            "fid": "somethingIdForFile"
+        }
+    ],
+    "binds": [
+        {
+            "fid": "somethingIdForFile",
+            "did": "somethingIdForDouban"
+        }
+    ]
+}
+```
+
+## Todo List
+
+* [ ] Migrate to SQLite
+* [ ] Test Available Video Formats
+* [ ] Theme
+* [ ] Recursive Directory Index
+* [ ] Customize Sort
+* [ ] Efficient Thumbnail
+* [ ] Rebind USB + Thumbnail Rename
+* [ ] Clear Thumbnail
+* [ ] i18n
+* [ ] Performance
 
 ---
 

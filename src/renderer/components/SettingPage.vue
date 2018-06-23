@@ -56,13 +56,15 @@ export default {
             mountIndex: v.mountIndex,
             partitions: v.partitions,
             size: v.size,
-            path: d.path || "/"
+            path: d.path || "/",
+            vid: v.uuid,
+            pid: d.uuid
           };
           if (block.isPortable)
             block.volume = `${block.description} (${block.mountIndex +
               1}号分区 / 共${block.partitions}个) - ${utils.formatBytes(
-              block.size
-            )}`;
+                block.size
+              )}`;
           data.push(block);
         });
       });
@@ -179,18 +181,34 @@ export default {
       let newconf = utils.copyObj(this.app_config);
       newconf.volumes.forEach(v => {
         v.directories = v.directories.filter(d => {
-          let path = blk.path;
-          if (path == "/") path = "";
-          let dircond = blk.isPortable
-            ? v.description == blk.description &&
-              v.mountIndex == blk.mountIndex &&
-              v.partitions == blk.partitions &&
-              v.size == blk.size
-            : v.volume == blk.volume;
-          return !(dircond && path === d.path);
+          return d.uuid != blk.pid
         });
       });
+      let removeFiles = []
+      newconf.files = newconf.files.filter(f => {
+        let floc = newconf.locates.find(x => x.fid == f.uuid)
+        if (floc.vid == blk.vid && floc.pid == blk.pid) {
+          removeFiles.push(floc.fid)
+        }
+        return floc.vid != blk.vid || floc.pid != blk.pid
+      })
+      newconf.binds = newconf.binds.filter(x => removeFiles.indexOf(x) < 0)
+      newconf.locates = newconf.locates.filter(x => x.vid != blk.vid || x.pid != blk.pid)
+      newconf.volumes = newconf.volumes.filter(x => x.directories.length > 0)
       this.setConfig(newconf);
+      let pazh = blk.path
+      if (pazh == '/') pazh = ''
+      if (blk.isPortable) {
+        utils.parseUSB2Vol(blk.description,
+          blk.mountIndex,
+          blk.partitions,
+          blk.size).then(dev => {
+            if (!dev.length) return
+            this.emit(`removedDirectory:${encodeURIComponent(dev[0] + pazh)}`)
+          })
+      } else {
+        this.emit(`removedDirectory:${encodeURIComponent(blk.volume + pazh)}`)
+      }
     },
     resetCFG(e, i) {
       this.setByPath([i.path, e]);
